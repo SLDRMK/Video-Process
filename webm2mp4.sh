@@ -1,8 +1,9 @@
 #!/bin/bash
-# 批量将视频文件转为30fps的mp4，支持裁剪功能
-# 用法: ./webm2mp4.sh [视频路径] [入点秒数] [出点秒数]
-# 示例: ./webm2mp4.sh "视频文件.mp4" 5 15  # 从第5秒裁剪到第15秒
-# 示例: ./webm2mp4.sh "视频文件.webm"     # 完整转换
+# 批量将视频文件转为30fps的mp4，支持裁剪和旋转功能
+# 用法: ./webm2mp4.sh [视频路径] [入点秒数] [出点秒数] [旋转角度]
+# 示例: ./webm2mp4.sh "视频文件.mp4" 5 15 90  # 从第5秒裁剪到第15秒，顺时针旋转90度
+# 示例: ./webm2mp4.sh "视频文件.webm" "" "" 180  # 完整转换，顺时针旋转180度
+# 示例: ./webm2mp4.sh "视频文件.avi"     # 完整转换，默认顺时针旋转90度
 
 # 颜色定义
 RED='\033[0;31m'
@@ -14,19 +15,22 @@ NC='\033[0m' # No Color
 # 显示帮助信息
 show_help() {
     echo -e "${BLUE}视频转换工具${NC}"
-    echo "用法: $0 [视频路径] [入点秒数] [出点秒数]"
+    echo "用法: $0 [视频路径] [入点秒数] [出点秒数] [旋转角度]"
     echo ""
     echo "参数说明:"
     echo "  视频路径    支持 .mp4, .webm, .avi, .mkv 等格式"
-    echo "  入点秒数    开始裁剪的时间点（可选）"
-    echo "  出点秒数    结束裁剪的时间点（可选）"
+    echo "  入点秒数    开始裁剪的时间点（可选，使用空字符串跳过）"
+    echo "  出点秒数    结束裁剪的时间点（可选，使用空字符串跳过）"
+    echo "  旋转角度    顺时针旋转角度：90, 180, 270（可选，默认90度）"
     echo ""
     echo "示例:"
-    echo "  $0 \"video.mp4\"           # 完整转换"
-    echo "  $0 \"video.webm\" 5 15     # 从第5秒裁剪到第15秒"
-    echo "  $0 \"video.avi\" 0 10      # 从开始裁剪到第10秒"
+    echo "  $0 \"video.mp4\"           # 完整转换，默认旋转90度"
+    echo "  $0 \"video.webm\" 5 15     # 从第5秒裁剪到第15秒，默认旋转90度"
+    echo "  $0 \"video.avi\" \"\" \"\" 180  # 完整转换，旋转180度"
+    echo "  $0 \"video.mp4\" 0 10 270  # 从开始裁剪到第10秒，旋转270度"
     echo ""
     echo "支持格式: mp4, webm, avi, mkv, mov, flv, wmv"
+    echo "旋转角度: 90度（默认）, 180度, 270度"
 }
 
 # 检查参数
@@ -38,7 +42,9 @@ fi
 VIDEO_PATH="$1"
 START_TIME=""
 END_TIME=""
+ROTATION_ANGLE="90"  # 默认顺时针旋转90度
 CROP_OPTION=""
+ROTATION_OPTION=""
 
 # 检查视频文件是否存在
 if [ ! -f "$VIDEO_PATH" ]; then
@@ -53,19 +59,56 @@ if [[ ! " $SUPPORTED_FORMATS " =~ " $FILE_EXT " ]]; then
     echo -e "${YELLOW}警告: 不支持的格式 '$FILE_EXT'，但会尝试转换${NC}"
 fi
 
-# 处理裁剪参数
-if [ $# -eq 3 ]; then
-    START_TIME=$2
-    END_TIME=$3
-    CROP_OPTION="-ss $START_TIME -to $END_TIME"
-    echo -e "${BLUE}裁剪模式: 从 ${START_TIME}秒 到 ${END_TIME}秒${NC}"
-elif [ $# -eq 1 ]; then
-    echo -e "${BLUE}完整转换模式: 不裁剪${NC}"
-else
-    echo -e "${RED}错误: 参数数量不正确${NC}"
-    show_help
+# 处理参数
+case $# in
+    1)  # 只有视频路径，使用默认设置
+        echo -e "${BLUE}完整转换模式: 不裁剪，默认旋转90度${NC}"
+        ;;
+    2)  # 视频路径 + 旋转角度
+        ROTATION_ANGLE="$2"
+        echo -e "${BLUE}完整转换模式: 不裁剪，旋转${ROTATION_ANGLE}度${NC}"
+        ;;
+    3)  # 视频路径 + 入点 + 出点
+        START_TIME="$2"
+        END_TIME="$3"
+        if [ -n "$START_TIME" ] && [ -n "$END_TIME" ]; then
+            CROP_OPTION="-ss $START_TIME -to $END_TIME"
+            echo -e "${BLUE}裁剪模式: 从 ${START_TIME}秒 到 ${END_TIME}秒，默认旋转90度${NC}"
+        else
+            echo -e "${BLUE}完整转换模式: 不裁剪，旋转${END_TIME}度${NC}"
+            ROTATION_ANGLE="$3"
+        fi
+        ;;
+    4)  # 视频路径 + 入点 + 出点 + 旋转角度
+        START_TIME="$2"
+        END_TIME="$3"
+        ROTATION_ANGLE="$4"
+        if [ -n "$START_TIME" ] && [ -n "$END_TIME" ]; then
+            CROP_OPTION="-ss $START_TIME -to $END_TIME"
+            echo -e "${BLUE}裁剪模式: 从 ${START_TIME}秒 到 ${END_TIME}秒，旋转${ROTATION_ANGLE}度${NC}"
+        else
+            echo -e "${BLUE}完整转换模式: 不裁剪，旋转${ROTATION_ANGLE}度${NC}"
+        fi
+        ;;
+    *)
+        echo -e "${RED}错误: 参数数量不正确${NC}"
+        show_help
+        exit 1
+        ;;
+esac
+
+# 验证旋转角度
+if [[ ! "$ROTATION_ANGLE" =~ ^(90|180|270)$ ]]; then
+    echo -e "${RED}错误: 旋转角度必须是 90, 180 或 270${NC}"
     exit 1
 fi
+
+# 设置旋转选项
+case $ROTATION_ANGLE in
+    90)  ROTATION_OPTION="transpose=1" ;;
+    180) ROTATION_OPTION="transpose=1,transpose=1" ;;
+    270) ROTATION_OPTION="transpose=2" ;;
+esac
 
 # 获取视频信息
 echo -e "${YELLOW}正在分析视频信息...${NC}"
@@ -117,6 +160,7 @@ echo -e "${GREEN}=== 转换设置 ===${NC}"
 echo -e "目标帧率: ${BLUE}30 fps${NC}"
 echo -e "目标格式: ${BLUE}MP4 (H.264)${NC}"
 echo -e "音频编码: ${BLUE}AAC${NC}"
+echo -e "旋转角度: ${BLUE}${ROTATION_ANGLE}度${NC}"
 
 # 调整分辨率（确保为偶数）
 WIDTH_EVEN=$((WIDTH/2*2))
@@ -128,9 +172,9 @@ fi
 # 生成输出文件名
 BASE_NAME=$(basename "$VIDEO_PATH" ".$FILE_EXT")
 if [ -n "$CROP_OPTION" ]; then
-    OUTPUT_FILE="${BASE_NAME}_${START_TIME}s-${END_TIME}s_30fps.mp4"
+    OUTPUT_FILE="${BASE_NAME}_${START_TIME}s-${END_TIME}s_rot${ROTATION_ANGLE}_30fps.mp4"
 else
-    OUTPUT_FILE="${BASE_NAME}_30fps.mp4"
+    OUTPUT_FILE="${BASE_NAME}_rot${ROTATION_ANGLE}_30fps.mp4"
 fi
 
 echo -e "输出文件: ${BLUE}$OUTPUT_FILE${NC}"
@@ -147,8 +191,13 @@ fi
 echo -e "${YELLOW}开始转换...${NC}"
 
 # 执行转换
-ffmpeg -y $CROP_OPTION -i "$VIDEO_PATH" -r 30 -vf "scale=${WIDTH_EVEN}:${HEIGHT_EVEN}" \
-    -c:v libx264 -preset medium -crf 23 -c:a aac -b:a 128k "$OUTPUT_FILE"
+if [ -n "$ROTATION_OPTION" ]; then
+    ffmpeg -y $CROP_OPTION -i "$VIDEO_PATH" -r 30 -vf "$ROTATION_OPTION,scale=${WIDTH_EVEN}:${HEIGHT_EVEN}" \
+        -c:v libx264 -preset medium -crf 23 -c:a aac -b:a 128k "$OUTPUT_FILE"
+else
+    ffmpeg -y $CROP_OPTION -i "$VIDEO_PATH" -r 30 -vf "scale=${WIDTH_EVEN}:${HEIGHT_EVEN}" \
+        -c:v libx264 -preset medium -crf 23 -c:a aac -b:a 128k "$OUTPUT_FILE"
+fi
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ 转换完成: $OUTPUT_FILE${NC}"
