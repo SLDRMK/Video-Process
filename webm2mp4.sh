@@ -3,7 +3,7 @@
 # 用法: ./webm2mp4.sh [视频路径] [入点秒数] [出点秒数] [旋转角度]
 # 示例: ./webm2mp4.sh "视频文件.mp4" 5 15 90  # 从第5秒裁剪到第15秒，顺时针旋转90度
 # 示例: ./webm2mp4.sh "视频文件.webm" "" "" 180  # 完整转换，顺时针旋转180度
-# 示例: ./webm2mp4.sh "视频文件.avi"     # 完整转换，默认顺时针旋转90度
+# 示例: ./webm2mp4.sh "视频文件.avi"     # 完整转换，默认不旋转
 
 # 颜色定义
 RED='\033[0;31m'
@@ -21,16 +21,17 @@ show_help() {
     echo "  视频路径    支持 .mp4, .webm, .avi, .mkv 等格式"
     echo "  入点秒数    开始裁剪的时间点（可选，使用空字符串跳过）"
     echo "  出点秒数    结束裁剪的时间点（可选，使用空字符串跳过）"
-    echo "  旋转角度    顺时针旋转角度：90, 180, 270（可选，默认90度）"
+    echo "  旋转角度    顺时针旋转角度：0, 90, 180, 270（可选，默认0度）"
     echo ""
     echo "示例:"
-    echo "  $0 \"video.mp4\"           # 完整转换，默认旋转90度"
-    echo "  $0 \"video.webm\" 5 15     # 从第5秒裁剪到第15秒，默认旋转90度"
+    echo "  $0 \"video.mp4\"           # 完整转换，默认不旋转"
+    echo "  $0 \"video.webm\" 5 15     # 从第5秒裁剪到第15秒，默认不旋转"
     echo "  $0 \"video.avi\" \"\" \"\" 180  # 完整转换，旋转180度"
+    echo "  $0 \"video.mov\" \"\" \"\" 0    # 完整转换，不旋转"
     echo "  $0 \"video.mp4\" 0 10 270  # 从开始裁剪到第10秒，旋转270度"
     echo ""
     echo "支持格式: mp4, webm, avi, mkv, mov, flv, wmv"
-    echo "旋转角度: 90度（默认）, 180度, 270度"
+    echo "旋转角度: 0度（默认，不旋转）, 90度, 180度, 270度"
 }
 
 # 检查参数
@@ -42,7 +43,7 @@ fi
 VIDEO_PATH="$1"
 START_TIME=""
 END_TIME=""
-ROTATION_ANGLE="90"  # 默认顺时针旋转90度
+ROTATION_ANGLE="0"  # 默认不旋转
 CROP_OPTION=""
 ROTATION_OPTION=""
 
@@ -62,7 +63,7 @@ fi
 # 处理参数
 case $# in
     1)  # 只有视频路径，使用默认设置
-        echo -e "${BLUE}完整转换模式: 不裁剪，默认旋转90度${NC}"
+        echo -e "${BLUE}完整转换模式: 不裁剪，默认不旋转${NC}"
         ;;
     2)  # 视频路径 + 旋转角度
         ROTATION_ANGLE="$2"
@@ -73,7 +74,7 @@ case $# in
         END_TIME="$3"
         if [ -n "$START_TIME" ] && [ -n "$END_TIME" ]; then
             CROP_OPTION="-ss $START_TIME -to $END_TIME"
-            echo -e "${BLUE}裁剪模式: 从 ${START_TIME}秒 到 ${END_TIME}秒，默认旋转90度${NC}"
+            echo -e "${BLUE}裁剪模式: 从 ${START_TIME}秒 到 ${END_TIME}秒，默认不旋转${NC}"
         else
             echo -e "${BLUE}完整转换模式: 不裁剪，旋转${END_TIME}度${NC}"
             ROTATION_ANGLE="$3"
@@ -98,13 +99,14 @@ case $# in
 esac
 
 # 验证旋转角度
-if [[ ! "$ROTATION_ANGLE" =~ ^(90|180|270)$ ]]; then
-    echo -e "${RED}错误: 旋转角度必须是 90, 180 或 270${NC}"
+if [[ ! "$ROTATION_ANGLE" =~ ^(0|90|180|270)$ ]]; then
+    echo -e "${RED}错误: 旋转角度必须是 0, 90, 180 或 270${NC}"
     exit 1
 fi
 
 # 设置旋转选项
 case $ROTATION_ANGLE in
+    0)   ROTATION_OPTION="" ;;
     90)  ROTATION_OPTION="transpose=1" ;;
     180) ROTATION_OPTION="transpose=1,transpose=1" ;;
     270) ROTATION_OPTION="transpose=2" ;;
@@ -169,13 +171,15 @@ if [ "$WIDTH" != "$WIDTH_EVEN" ] || [ "$HEIGHT" != "$HEIGHT_EVEN" ]; then
     echo -e "分辨率调整: ${BLUE}${WIDTH}x${HEIGHT} → ${WIDTH_EVEN}x${HEIGHT_EVEN}${NC}"
 fi
 
-# 生成输出文件名
+# 生成输出文件名（默认输出到原视频所在目录）
+VIDEO_DIR=$(dirname "$VIDEO_PATH")
 BASE_NAME=$(basename "$VIDEO_PATH" ".$FILE_EXT")
 if [ -n "$CROP_OPTION" ]; then
-    OUTPUT_FILE="${BASE_NAME}_${START_TIME}s-${END_TIME}s_rot${ROTATION_ANGLE}_30fps.mp4"
+    OUTPUT_NAME="${BASE_NAME}_${START_TIME}s-${END_TIME}s_rot${ROTATION_ANGLE}_30fps.mp4"
 else
-    OUTPUT_FILE="${BASE_NAME}_rot${ROTATION_ANGLE}_30fps.mp4"
+    OUTPUT_NAME="${BASE_NAME}_rot${ROTATION_ANGLE}_30fps.mp4"
 fi
+OUTPUT_FILE="${VIDEO_DIR}/${OUTPUT_NAME}"
 
 echo -e "输出文件: ${BLUE}$OUTPUT_FILE${NC}"
 echo ""
